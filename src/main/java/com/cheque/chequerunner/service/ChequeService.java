@@ -46,7 +46,7 @@ public class ChequeService {
         cheque.setAmount(request.getAmount());
         cheque.setDrawer(drawer);
         cheque.setIssueDate(LocalDate.now());
-        cheque.setStatus(Cheque.ChequeStatus.ISSUED);
+        cheque.setChequeStatus(Cheque.ChequeStatus.ISSUED);
         return chequeRepository.save(cheque);
     }
 
@@ -69,13 +69,13 @@ public class ChequeService {
         if (drawer.getBalance().compareTo(cheque.getAmount()) < 0) {
             createBounceRecord(chequeId, "Insufficient Funds");
 
-            cheque.setStatus(Cheque.ChequeStatus.BOUNCED);
+            cheque.setChequeStatus(Cheque.ChequeStatus.BOUNCED);
             chequeRepository.save(cheque);
 
             long bounceCount = countBouncesInLast12Months(drawer.getId());
 
             if (bounceCount >= 2) {
-                drawer.setStatus(Account.AccountStatus.BLOCKED);
+                drawer.setAccountStatus(Account.AccountStatus.BLOCKED);
                 accountRepository.save(drawer);
             }
 
@@ -85,7 +85,7 @@ public class ChequeService {
         drawer.setBalance(drawer.getBalance().subtract(cheque.getAmount()));
         accountRepository.save(drawer);
 
-        cheque.setStatus(Cheque.ChequeStatus.PAID);
+        cheque.setChequeStatus(Cheque.ChequeStatus.PAID);
         return chequeRepository.save(cheque);
     }
 

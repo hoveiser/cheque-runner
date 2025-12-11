@@ -50,14 +50,14 @@ public class ChequeServiceTest {
         drawer = new Account();
         drawer.setId(1L);
         drawer.setBalance(new BigDecimal("2000.00"));
-        drawer.setStatus(Account.AccountStatus.ACTIVE);
+        drawer.setAccountStatus(Account.AccountStatus.ACTIVE);
 
         cheque = new Cheque();
         cheque.setId(2L);
         cheque.setDrawer(drawer);
         cheque.setAmount(new BigDecimal("100.00"));
         cheque.setNumber("YT-2025-0011");
-        cheque.setStatus(Cheque.ChequeStatus.ISSUED);
+        cheque.setChequeStatus(Cheque.ChequeStatus.ISSUED);
         cheque.setIssueDate(LocalDate.now());
     }
 
@@ -74,7 +74,7 @@ public class ChequeServiceTest {
         Cheque result = chequeService.issueCheque(request);
 
         assertNotNull(result);
-        assertEquals(Cheque.ChequeStatus.ISSUED, result.getStatus());
+        assertEquals(Cheque.ChequeStatus.ISSUED, result.getChequeStatus());
         verify(sayadClient, times(1)).register("YT-2025-0001");
     }
 
@@ -104,7 +104,7 @@ public class ChequeServiceTest {
 
         Cheque result = chequeService.presentCheque(10L);
 
-        assertEquals(Cheque.ChequeStatus.PAID, result.getStatus());
+        assertEquals(Cheque.ChequeStatus.PAID, result.getChequeStatus());
         // موجودی صادرکننده: 2000 - 100 = 1900
         assertEquals(new BigDecimal("1900.00"), drawer.getBalance());
     }
@@ -119,7 +119,7 @@ public class ChequeServiceTest {
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> chequeService.presentCheque(2L));
 
-        assertEquals(Cheque.ChequeStatus.ISSUED, cheque.getStatus());
+        assertEquals(Cheque.ChequeStatus.ISSUED, cheque.getChequeStatus());
         assertEquals(HttpStatus.NOT_ACCEPTABLE, exception.getStatusCode());
         assertEquals("Cheque not valid by Sayad service",exception.getReason());
         verify(chequeRepository, never()).save(any());
@@ -131,12 +131,12 @@ public class ChequeServiceTest {
         when(sayadClient.present(any())).thenReturn(true);
         when(chequeRepository.findById(2L)).thenReturn(Optional.of(cheque));
 
-        cheque.setStatus(Cheque.ChequeStatus.ISSUED);
+        cheque.setChequeStatus(Cheque.ChequeStatus.ISSUED);
         cheque.setIssueDate(LocalDate.now().minusMonths(6).minusDays(1));
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> chequeService.presentCheque(2L));
 
-        assertEquals(Cheque.ChequeStatus.ISSUED, cheque.getStatus());
+        assertEquals(Cheque.ChequeStatus.ISSUED, cheque.getChequeStatus());
         assertEquals(HttpStatus.NOT_ACCEPTABLE, exception.getStatusCode());
         assertEquals("Cheque validity window expired (over 6 months).",exception.getReason());
         verify(chequeRepository, never()).save(any());
@@ -157,7 +157,7 @@ public class ChequeServiceTest {
         verify(accountRepository, times(1)).save(drawer);
         assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
         assertEquals("Cheque bounced.",exception.getReason());
-        assertEquals(Account.AccountStatus.BLOCKED, drawer.getStatus());
-        assertEquals(Cheque.ChequeStatus.BOUNCED, cheque.getStatus());
+        assertEquals(Account.AccountStatus.BLOCKED, drawer.getAccountStatus());
+        assertEquals(Cheque.ChequeStatus.BOUNCED, cheque.getChequeStatus());
     }
 }
