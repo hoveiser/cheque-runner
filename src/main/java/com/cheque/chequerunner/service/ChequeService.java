@@ -63,9 +63,7 @@ public class ChequeService {
         }
 
         if (LocalDate.now().isAfter(cheque.getIssueDate().plusMonths(6))) {
-            cheque.setStatus(Cheque.ChequeStatus.BOUNCED);
-            chequeRepository.save(cheque);
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cheque validity window expired (over 6 months).");
+            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "Cheque validity window expired (over 6 months).");
         }
 
         if (drawer.getBalance().compareTo(cheque.getAmount()) < 0) {
@@ -76,7 +74,7 @@ public class ChequeService {
 
             long bounceCount = countBouncesInLast12Months(drawer.getId());
 
-            if (bounceCount >= 3) {
+            if (bounceCount >= 2) {
                 drawer.setStatus(Account.AccountStatus.BLOCKED);
                 accountRepository.save(drawer);
             }
