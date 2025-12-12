@@ -1,14 +1,14 @@
 # Cheque Runner Service
 
-This project is a centralized Spring Boot service designed to manage the full lifecycle of Sayad (Iranian national
-system) cheques, including issuance, presentation, bouncing, and associated account balance management. The API is
-secured using JWT with an initial Basic Authentication handshake.
+This project is a centralized Spring Boot service designed to manage Sayad cheques, including issuance, presentation,
+bouncing, and associated account balance management.
+The API is secured using JWT with an initial Basic Authentication handshake.
 
 ## 🚀 Technologies Used
 
 * **Language:** Java 21 (or later)
-* **Framework:** Spring Boot 3.2.x
-* **Database:** H2 Database (for development/testing) / PostgreSQL (for production)
+* **Framework:** Spring Boot 3.5.8
+* **Database:** H2 Database (for development/testing)
 * **Persistence:** Spring Data JPA / Hibernate
 * **API Documentation:** SpringDoc OpenAPI (Swagger UI)
 * **Security:** Spring Security (Basic Auth / JWT)
