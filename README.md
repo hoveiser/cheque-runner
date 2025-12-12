@@ -63,9 +63,9 @@ mvn spring-boot:run
 # Password: teller
 # Assuming user want to present some cheque: /api/auth/token
 curl -X POST "http://localhost:8544/api/cheques/1/present" \
--H "Content-Type: application/json" \
--H "Authorization: Basic $(echo -n teller1:teller | base64)" \
--d ''
+     -H "Content-Type: application/json" \
+     -H "Authorization: Basic $(echo -n teller1:teller | base64)" \
+     -d ''
 ```
 you should give this response like this(on happy scenario) :
 ````
@@ -95,9 +95,9 @@ curl -X POST "http://localhost:8544/api/cheques" \
 **Sample**
 ````bash
 curl -X POST "http://localhost:8544/api/cheques/1/present" \
--H "Content-Type: application/json" \
--H "Authorization: Basic $(echo -n teller1:teller | base64)" \
--d ''
+     -H "Content-Type: application/json" \
+     -H "Authorization: Basic $(echo -n teller1:teller | base64)" \
+     -d ''
 ````
 
 **📖 API Documentation (Swagger UI)**
