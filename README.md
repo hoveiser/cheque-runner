@@ -74,6 +74,32 @@ you should give this response like this(on happy scenario) :
 
 ## 📚 API Endpoints and Examples
 
+**1. Issue Cheque (``POST /api/cheques``)**
+
+Creates and registers a new cheque. Requires sufficient balance in the drawer account.
+
+**Sample**
+````bash
+curl -X POST "http://localhost:8544/api/cheques" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Basic $(echo -n teller1:teller | base64)" \
+     -d '{
+           "drawerId": 1, 
+           "number": "YT-2025-001", 
+           "amount": 1500.00,
+         }'
+````
+
+**2. Present Cheque (POST /api/cheques/present/{number})**
+
+**Sample**
+````bash
+curl -X POST "http://localhost:8544/api/cheques/1/present" \
+-H "Content-Type: application/json" \
+-H "Authorization: Basic $(echo -n teller1:teller | base64)" \
+-d ''
+````
+
 **📖 API Documentation (Swagger UI)**
 
 * **Swagger UI (Graphical Interface)** : ``http://localhost:8544/swagger-ui.html``
