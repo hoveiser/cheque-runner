@@ -3,6 +3,7 @@ package com.cheque.chequerunner.view;
 import com.cheque.chequerunner.domain.Cheque;
 import com.cheque.chequerunner.service.ChequeService;
 import com.cheque.chequerunner.service.dto.ChequeIssueRequest;
+import com.cheque.chequerunner.service.dto.ResponseMessage;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,8 +26,8 @@ public class ChequeController {
     }
 
     @PostMapping("/{id}/present")
-    public ResponseEntity<Cheque> presentCheque(@PathVariable Long id) {
-        Cheque presentedCheque = chequeService.presentCheque(id);
-        return ResponseEntity.ok(presentedCheque);
+    public ResponseEntity<ResponseMessage> presentCheque(@PathVariable Long id) {
+        ResponseMessage responseMessage = chequeService.presentCheque(id);
+        return new ResponseEntity<>(responseMessage, responseMessage.getStatusCode());
     }
 }

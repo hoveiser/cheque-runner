@@ -7,6 +7,7 @@ import com.cheque.chequerunner.repository.AccountRepository;
 import com.cheque.chequerunner.repository.BounceRecordRepository;
 import com.cheque.chequerunner.repository.ChequeRepository;
 import com.cheque.chequerunner.service.dto.ChequeIssueRequest;
+import com.cheque.chequerunner.service.dto.ResponseMessage;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +32,11 @@ public class ChequeService {
         Account drawer = accountRepository.findById(request.getDrawerId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Drawer account not found"));
 
+        Optional<Cheque> existedCheque = chequeRepository.findByNumberAndDrawerId(request.getNumber(), drawer.getId());
+
+        if(existedCheque.isPresent()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cheque already exists");
+        }
 
         if (drawer.getBalance().compareTo(request.getAmount()) < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient balance to issue cheque.");
@@ -51,9 +58,17 @@ public class ChequeService {
     }
 
     @Transactional
-    public Cheque presentCheque(Long chequeId) {
+    public ResponseMessage presentCheque(Long chequeId) {
         Cheque cheque = chequeRepository.findById(chequeId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cheque not found"));
+
+        if(Cheque.ChequeStatus.PAID.equals(cheque.getChequeStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cheque already paid.");
+        }
+
+        if(Cheque.ChequeStatus.BOUNCED.equals(cheque.getChequeStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cheque already bounced.");
+        }
 
         Account drawer = cheque.getDrawer();
 
@@ -67,37 +82,43 @@ public class ChequeService {
         }
 
         if (drawer.getBalance().compareTo(cheque.getAmount()) < 0) {
-            createBounceRecord(chequeId, "Insufficient Funds");
 
-            cheque.setChequeStatus(Cheque.ChequeStatus.BOUNCED);
-            chequeRepository.save(cheque);
+            String message="Insufficient Funds";
+            commitBounce(cheque, drawer.getId(), message);
 
-            long bounceCount = countBouncesInLast12Months(drawer.getId());
-
-            if (bounceCount >= 2) {
-                drawer.setAccountStatus(Account.AccountStatus.BLOCKED);
-                accountRepository.save(drawer);
-            }
-
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cheque bounced.");
+            return new ResponseMessage("Cheque bounced.", HttpStatus.CONFLICT,message);
         }
 
         drawer.setBalance(drawer.getBalance().subtract(cheque.getAmount()));
         accountRepository.save(drawer);
 
         cheque.setChequeStatus(Cheque.ChequeStatus.PAID);
-        return chequeRepository.save(cheque);
-    }
-
-    private void createBounceRecord(Long chequeId, String reason) {
-        BounceRecord bounceRecord = new BounceRecord();
-        bounceRecord.setChequeId(chequeId);
-        bounceRecord.setDate(LocalDate.now());
-        bounceRecord.setReason(reason);
-        bounceRepository.save(bounceRecord);
+        chequeRepository.save(cheque);
+        return new ResponseMessage("cheque paid.", HttpStatus.OK,"Sufficient Funds");
     }
 
     private long countBouncesInLast12Months(Long drawerId) {
         return bounceRepository.countBouncesByDrawerAndDateAfter(drawerId, LocalDate.now().minusYears(1));
+    }
+
+    private void commitBounce(Cheque cheque, Long drawerId, String reason) {
+        BounceRecord bounceRecord = new BounceRecord();
+        bounceRecord.setChequeId(cheque.getId());
+        bounceRecord.setDate(LocalDate.now());
+        bounceRecord.setReason(reason);
+        bounceRepository.save(bounceRecord);
+
+        cheque.setChequeStatus(Cheque.ChequeStatus.BOUNCED);
+        chequeRepository.save(cheque);
+
+
+        long bounceCount = countBouncesInLast12Months(drawerId);
+        if (bounceCount >= 2) {
+            Account drawer = cheque.getDrawer();
+            if (drawer != null) {
+                drawer.setAccountStatus(Account.AccountStatus.BLOCKED);
+                accountRepository.save(drawer);
+            }
+        }
     }
 }

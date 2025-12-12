@@ -6,6 +6,7 @@ import com.cheque.chequerunner.repository.AccountRepository;
 import com.cheque.chequerunner.repository.BounceRecordRepository;
 import com.cheque.chequerunner.repository.ChequeRepository;
 import com.cheque.chequerunner.service.dto.ChequeIssueRequest;
+import com.cheque.chequerunner.service.dto.ResponseMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -68,7 +69,6 @@ public class ChequeServiceTest {
 
         ChequeIssueRequest request = new ChequeIssueRequest(1L, "YT-2025-0001", new BigDecimal("500.00"));
 
-        // شبیه‌سازی ذخیره موفق
         when(chequeRepository.save(any(Cheque.class))).thenAnswer(i -> i.getArgument(0));
 
         Cheque result = chequeService.issueCheque(request);
@@ -91,8 +91,6 @@ public class ChequeServiceTest {
         verify(chequeRepository, never()).save(any());
     }
 
-    // --- تست‌های ارائه چک (Present Cheque) ---
-
     @Test
     void presentCheque_ShouldSucceed() {
         when(sayadClient.present(any())).thenReturn(true);
@@ -102,10 +100,12 @@ public class ChequeServiceTest {
         when(chequeRepository.findById(10L)).thenReturn(Optional.of(cheque));
         when(chequeRepository.save(any(Cheque.class))).thenAnswer(i -> i.getArgument(0));
 
-        Cheque result = chequeService.presentCheque(10L);
+        ResponseMessage responseMessage = chequeService.presentCheque(10L);
 
-        assertEquals(Cheque.ChequeStatus.PAID, result.getChequeStatus());
-        // موجودی صادرکننده: 2000 - 100 = 1900
+
+        assertEquals("cheque paid.",responseMessage.getMessage());
+        assertEquals("Sufficient Funds",responseMessage.getReason());
+        assertEquals(HttpStatus.OK, responseMessage.getStatusCode());
         assertEquals(new BigDecimal("1900.00"), drawer.getBalance());
     }
 
@@ -142,8 +142,6 @@ public class ChequeServiceTest {
         verify(chequeRepository, never()).save(any());
     }
 
-    // --- تست قانون ۳ برگشتی (Bounce Rule Test) ---
-
     @Test
     void presentCheque_ShouldBounceAndBlockAccount_WhenThirdBounceOccurs() {
         when(sayadClient.present(any())).thenReturn(true);
@@ -152,11 +150,11 @@ public class ChequeServiceTest {
 
         when(bounceRepository.countBouncesByDrawerAndDateAfter(eq(1L), any(LocalDate.class))).thenReturn(2L);
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> chequeService.presentCheque(12L));
+        ResponseMessage responseMessage = chequeService.presentCheque(12L);
 
         verify(accountRepository, times(1)).save(drawer);
-        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
-        assertEquals("Cheque bounced.",exception.getReason());
+        assertEquals(HttpStatus.CONFLICT, responseMessage.getStatusCode());
+        assertEquals("Cheque bounced.",responseMessage.getMessage());
         assertEquals(Account.AccountStatus.BLOCKED, drawer.getAccountStatus());
         assertEquals(Cheque.ChequeStatus.BOUNCED, cheque.getChequeStatus());
     }

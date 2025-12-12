@@ -2,9 +2,12 @@ package com.cheque.chequerunner.controller;
 
 import com.cheque.chequerunner.ChequeRunnerApplication;
 import com.cheque.chequerunner.domain.Account;
+import com.cheque.chequerunner.domain.Cheque;
 import com.cheque.chequerunner.repository.AccountRepository;
+import com.cheque.chequerunner.repository.BounceRecordRepository;
 import com.cheque.chequerunner.repository.ChequeRepository;
 import com.cheque.chequerunner.service.dto.ChequeIssueRequest;
+import com.cheque.chequerunner.service.dto.ResponseMessage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +19,7 @@ import org.springframework.http.*;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,6 +38,9 @@ class ChequeIntegrationTest {
 
     @Autowired
     private ChequeRepository chequeRepository;
+
+    @Autowired
+    private BounceRecordRepository bounceRecordRepository;
 
     private HttpHeaders headers;
     private String baseUrl;
@@ -74,10 +81,11 @@ class ChequeIntegrationTest {
         Long issuedChequeId = chequeRepository.findAll().get(0).getId();
 
         HttpEntity<String> presentEntity = new HttpEntity<>(null, headers);
-        ResponseEntity<Account> presentResponse = restTemplate.exchange(
-                baseUrl + "/" + issuedChequeId + "/present", HttpMethod.POST, presentEntity, Account.class);
+        ResponseEntity<Cheque> presentResponse = restTemplate.exchange(
+                baseUrl + "/" + issuedChequeId + "/present", HttpMethod.POST, presentEntity, Cheque.class);
 
         assertEquals(HttpStatus.OK, presentResponse.getStatusCode());
+        assertEquals(Cheque.ChequeStatus.PAID, chequeRepository.findById(issuedChequeId).orElseThrow().getChequeStatus());
 
         Account finalDrawer = accountRepository.findById(drawer.getId()).orElseThrow();
 
@@ -90,13 +98,13 @@ class ChequeIntegrationTest {
         ChequeIssueRequest issueRequest = new ChequeIssueRequest(drawer.getId(), "YT-2025-0002", new BigDecimal("6000.00"));
         HttpEntity<ChequeIssueRequest> issueEntity = new HttpEntity<>(issueRequest, headers);
 
-        ResponseEntity<Account> presentResponse =restTemplate.exchange(baseUrl, HttpMethod.POST, issueEntity, Account.class);
+        ResponseEntity<Account> presentResponse = restTemplate.exchange(baseUrl, HttpMethod.POST, issueEntity, Account.class);
 
         assertEquals(HttpStatus.BAD_REQUEST, presentResponse.getStatusCode());
 
 
         Account finalDrawer = accountRepository.findById(drawer.getId()).orElseThrow();
-        assertEquals(new BigDecimal("5000.00"), finalDrawer.getBalance()); // باید همان 5000 بماند
+        assertEquals(new BigDecimal("5000.00"), finalDrawer.getBalance());
     }
 
 
@@ -111,5 +119,47 @@ class ChequeIntegrationTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
 
         assertTrue(Objects.requireNonNull(response.getBody()).contains("Cheque number format must be: Two-Letters-Four-Digits-Four-Digits"));
+    }
+
+    @Test
+    void presentCheque_ShouldFailAndBounce_WhenInsufficientBalance() throws Exception {
+        ChequeIssueRequest issueRequest1 = new ChequeIssueRequest(drawer.getId(), "YT-2025-0001", new BigDecimal("1000.00"));
+        ChequeIssueRequest issueRequest2 = new ChequeIssueRequest(drawer.getId(), "YT-2025-0002", new BigDecimal("4500.00"));
+        HttpEntity<ChequeIssueRequest> issueEntity = new HttpEntity<>(issueRequest1, headers);
+        HttpEntity<ChequeIssueRequest> issueEntity2 = new HttpEntity<>(issueRequest2, headers);
+
+        ResponseEntity<Account> issueResponse = restTemplate.exchange(
+                baseUrl, HttpMethod.POST, issueEntity, Account.class);
+
+        ResponseEntity<Account> issueResponse2 = restTemplate.exchange(
+                baseUrl, HttpMethod.POST, issueEntity2, Account.class);
+
+        assertEquals(HttpStatus.CREATED, issueResponse.getStatusCode());
+        assertEquals(HttpStatus.CREATED, issueResponse2.getStatusCode());
+        Long issuedChequeId1 = chequeRepository.findAll().get(0).getId();
+        Long issuedChequeId2 = chequeRepository.findAll().get(1).getId();
+
+        HttpEntity<String> presentEntity = new HttpEntity<>(null, headers);
+        ResponseEntity<ResponseMessage> presentResponse1 = restTemplate.exchange(
+                baseUrl + "/" + issuedChequeId1 + "/present", HttpMethod.POST, presentEntity, ResponseMessage.class);
+        ResponseEntity<ResponseMessage> presentResponse2 = restTemplate.exchange(
+                baseUrl + "/" + issuedChequeId2 + "/present", HttpMethod.POST, presentEntity, ResponseMessage.class);
+
+
+        assertEquals(HttpStatus.OK, presentResponse1.getStatusCode());
+        assertEquals(Cheque.ChequeStatus.PAID, chequeRepository.findById(issuedChequeId1).orElseThrow().getChequeStatus());
+        assertEquals(HttpStatus.CONFLICT, presentResponse2.getStatusCode());
+        assertEquals(Cheque.ChequeStatus.BOUNCED, chequeRepository.findById(issuedChequeId2).orElseThrow().getChequeStatus());
+
+
+        Optional<Cheque> bouncedCheque = chequeRepository.findById(issuedChequeId2);
+        assertTrue(bouncedCheque.isPresent(), "Cheque should exist after presentation attempt.");
+        assertEquals(Cheque.ChequeStatus.BOUNCED, bouncedCheque.get().getChequeStatus(), "Cheque status must be BOUNCED.");
+
+        Account account = accountRepository.findById(drawer.getId()).orElseThrow();
+        assertEquals(new BigDecimal("4000.00"), account.getBalance(),
+                "Drawer balance should remain unchanged (4000.00).");
+
+        assertEquals(1, bounceRecordRepository.count(),"bounce record should have exactly one record");
     }
 }
