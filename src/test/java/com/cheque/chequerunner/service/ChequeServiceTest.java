@@ -158,4 +158,70 @@ public class ChequeServiceTest {
         assertEquals(Account.AccountStatus.BLOCKED, drawer.getAccountStatus());
         assertEquals(Cheque.ChequeStatus.BOUNCED, cheque.getChequeStatus());
     }
+
+    @Test
+    void issueCheque_ShouldReject_WhenIssuedBefore() {
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(drawer));
+        when(sayadClient.register(any())).thenReturn(true);
+
+        ChequeIssueRequest request = new ChequeIssueRequest(1L, "YT-2025-0001", new BigDecimal("500.00"));
+
+        when(chequeRepository.save(any(Cheque.class))).thenAnswer(i -> i.getArgument(0));
+
+        Cheque result = chequeService.issueCheque(request);
+
+        assertNotNull(result);
+        assertEquals(Cheque.ChequeStatus.ISSUED, result.getChequeStatus());
+        verify(sayadClient, times(1)).register("YT-2025-0001");
+
+        when(chequeRepository.findByNumberAndDrawerId(any(),any())).thenReturn(Optional.of(cheque));
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> chequeService.issueCheque(request));
+        assertEquals("Cheque already exists", exception.getReason());
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+    }
+
+    @Test
+    void presentCheque_ShouldReject_WhenPaidBefore() {
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(drawer));
+        when(sayadClient.register(any())).thenReturn(true);
+
+        ChequeIssueRequest request = new ChequeIssueRequest(1L, "YT-2025-0001", new BigDecimal("500.00"));
+
+        when(chequeRepository.save(any(Cheque.class))).thenAnswer(i -> i.getArgument(0));
+        Cheque result = chequeService.issueCheque(request);
+        when(chequeRepository.findById(result.getId())).thenReturn(Optional.of(cheque));
+
+
+        assertNotNull(result);
+        assertEquals(Cheque.ChequeStatus.ISSUED, result.getChequeStatus());
+        verify(sayadClient, times(1)).register("YT-2025-0001");
+        cheque.setChequeStatus(Cheque.ChequeStatus.PAID);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> chequeService.presentCheque(result.getId()));
+        assertEquals("Cheque already paid.", exception.getReason());
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+    }
+
+    @Test
+    void presentCheque_ShouldReject_WhenBounceBefore() {
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(drawer));
+        when(sayadClient.register(any())).thenReturn(true);
+
+        ChequeIssueRequest request = new ChequeIssueRequest(1L, "YT-2025-0001", new BigDecimal("500.00"));
+
+        when(chequeRepository.save(any(Cheque.class))).thenAnswer(i -> i.getArgument(0));
+        Cheque result = chequeService.issueCheque(request);
+        when(chequeRepository.findById(result.getId())).thenReturn(Optional.of(cheque));
+
+
+        assertNotNull(result);
+        assertEquals(Cheque.ChequeStatus.ISSUED, result.getChequeStatus());
+        verify(sayadClient, times(1)).register("YT-2025-0001");
+        cheque.setChequeStatus(Cheque.ChequeStatus.BOUNCED);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> chequeService.presentCheque(result.getId()));
+        assertEquals("Cheque already bounced.", exception.getReason());
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+    }
+
 }
