@@ -1,5 +1,8 @@
 package com.cheque.chequerunner.config;
 
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.info.License;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -16,6 +19,17 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity
+@OpenAPIDefinition(
+        info = @Info(
+                title = "Cheque Runner API",
+                version = "v1.0",
+                description = "API for managing the lifecycle of Sayad cheques and bank accounts.",
+                license = @License(
+                        name = "Apache 2.0",
+                        url = "http://www.apache.org/licenses/LICENSE-2.0.html"
+                )
+        )
+)
 public class ProjectConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -40,6 +54,7 @@ public class ProjectConfig {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/h2/**").permitAll()
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs*/**").permitAll()
                         .requestMatchers("/api/**").hasRole("TELLER")
                         .anyRequest().authenticated()
                 )

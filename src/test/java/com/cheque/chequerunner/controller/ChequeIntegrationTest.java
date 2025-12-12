@@ -122,11 +122,15 @@ class ChequeIntegrationTest {
     }
 
     @Test
-    void presentCheque_ShouldFailAndBounce_WhenInsufficientBalance() throws Exception {
+    void presentCheque_ShouldFailAndBounceAndBlocked_WhenInsufficientBalance() throws Exception {
         ChequeIssueRequest issueRequest1 = new ChequeIssueRequest(drawer.getId(), "YT-2025-0001", new BigDecimal("1000.00"));
         ChequeIssueRequest issueRequest2 = new ChequeIssueRequest(drawer.getId(), "YT-2025-0002", new BigDecimal("4500.00"));
+        ChequeIssueRequest issueRequest3 = new ChequeIssueRequest(drawer.getId(), "YT-2025-0003", new BigDecimal("4600.00"));
+        ChequeIssueRequest issueRequest4 = new ChequeIssueRequest(drawer.getId(), "YT-2025-0004", new BigDecimal("4700.00"));
         HttpEntity<ChequeIssueRequest> issueEntity = new HttpEntity<>(issueRequest1, headers);
         HttpEntity<ChequeIssueRequest> issueEntity2 = new HttpEntity<>(issueRequest2, headers);
+        HttpEntity<ChequeIssueRequest> issueEntity3 = new HttpEntity<>(issueRequest3, headers);
+        HttpEntity<ChequeIssueRequest> issueEntity4 = new HttpEntity<>(issueRequest4, headers);
 
         ResponseEntity<Account> issueResponse = restTemplate.exchange(
                 baseUrl, HttpMethod.POST, issueEntity, Account.class);
@@ -134,21 +138,40 @@ class ChequeIntegrationTest {
         ResponseEntity<Account> issueResponse2 = restTemplate.exchange(
                 baseUrl, HttpMethod.POST, issueEntity2, Account.class);
 
+        ResponseEntity<Account> issueResponse3 = restTemplate.exchange(
+                baseUrl, HttpMethod.POST, issueEntity3, Account.class);
+
+        ResponseEntity<Account> issueResponse4 = restTemplate.exchange(
+                baseUrl, HttpMethod.POST, issueEntity4, Account.class);
+
         assertEquals(HttpStatus.CREATED, issueResponse.getStatusCode());
         assertEquals(HttpStatus.CREATED, issueResponse2.getStatusCode());
+        assertEquals(HttpStatus.CREATED, issueResponse3.getStatusCode());
+        assertEquals(HttpStatus.CREATED, issueResponse4.getStatusCode());
         Long issuedChequeId1 = chequeRepository.findAll().get(0).getId();
         Long issuedChequeId2 = chequeRepository.findAll().get(1).getId();
+        Long issuedChequeId3 = chequeRepository.findAll().get(2).getId();
+        Long issuedChequeId4 = chequeRepository.findAll().get(3).getId();
+
 
         HttpEntity<String> presentEntity = new HttpEntity<>(null, headers);
         ResponseEntity<ResponseMessage> presentResponse1 = restTemplate.exchange(
                 baseUrl + "/" + issuedChequeId1 + "/present", HttpMethod.POST, presentEntity, ResponseMessage.class);
         ResponseEntity<ResponseMessage> presentResponse2 = restTemplate.exchange(
                 baseUrl + "/" + issuedChequeId2 + "/present", HttpMethod.POST, presentEntity, ResponseMessage.class);
+        ResponseEntity<ResponseMessage> presentResponse3 = restTemplate.exchange(
+                baseUrl + "/" + issuedChequeId3 + "/present", HttpMethod.POST, presentEntity, ResponseMessage.class);
+        ResponseEntity<ResponseMessage> presentResponse4 = restTemplate.exchange(
+                baseUrl + "/" + issuedChequeId4 + "/present", HttpMethod.POST, presentEntity, ResponseMessage.class);
 
 
         assertEquals(HttpStatus.OK, presentResponse1.getStatusCode());
         assertEquals(Cheque.ChequeStatus.PAID, chequeRepository.findById(issuedChequeId1).orElseThrow().getChequeStatus());
         assertEquals(HttpStatus.CONFLICT, presentResponse2.getStatusCode());
+        assertEquals(Cheque.ChequeStatus.BOUNCED, chequeRepository.findById(issuedChequeId2).orElseThrow().getChequeStatus());
+        assertEquals(HttpStatus.CONFLICT, presentResponse3.getStatusCode());
+        assertEquals(Cheque.ChequeStatus.BOUNCED, chequeRepository.findById(issuedChequeId2).orElseThrow().getChequeStatus());
+        assertEquals(HttpStatus.CONFLICT, presentResponse4.getStatusCode());
         assertEquals(Cheque.ChequeStatus.BOUNCED, chequeRepository.findById(issuedChequeId2).orElseThrow().getChequeStatus());
 
 
@@ -159,7 +182,8 @@ class ChequeIntegrationTest {
         Account account = accountRepository.findById(drawer.getId()).orElseThrow();
         assertEquals(new BigDecimal("4000.00"), account.getBalance(),
                 "Drawer balance should remain unchanged (4000.00).");
+        assertEquals(Account.AccountStatus.BLOCKED, account.getAccountStatus(), "Account status must be BLOCKED.");
 
-        assertEquals(1, bounceRecordRepository.count(),"bounce record should have exactly one record");
+        assertEquals(3, bounceRecordRepository.count(), "bounce record should have exactly one record");
     }
 }
